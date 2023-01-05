@@ -13,24 +13,18 @@ import {AaveV2Ethereum} from "@aave-address-book/AaveV2Ethereum.sol";
  */
 contract ProposalPayload {
     address public immutable crvRepayment;
-    address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     address public constant AUSDC = 0xBcca60bB61934080951369a648Fb03DF4F96263C;
 
     constructor(address _crvRepayment) {
         crvRepayment = _crvRepayment;
     }
+
     /// @notice The AAVE governance executor calls this function to implement the proposal.
     function execute() external {
-        // Approve the CRV Repayment contract to withdraw up to 2,000,000 units of either USDC or AUSDC.
+        // Approve the CRV Repayment contract to withdraw up to 2,000,000 units of AUSDC.
         IAaveEcosystemReserveController(AaveV2Ethereum.COLLECTOR_CONTROLLER).approve(
             AaveV2Ethereum.COLLECTOR,
             AUSDC,
-            crvRepayment,
-            2_000_000e6
-        );
-        IAaveEcosystemReserveController(AaveV2Ethereum.COLLECTOR_CONTROLLER).approve(
-            AaveV2Ethereum.COLLECTOR,
-            USDC,
             crvRepayment,
             2_000_000e6
         );

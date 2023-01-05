@@ -6,13 +6,16 @@ import {AggregatorV3Interface} from "./external/AggregatorV3Interface.sol";
 import {IERC20} from "@openzeppelin/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
+/// @title CRVBadDebtRepayment
+/// @author Llama
+/// @notice Contract to purchase USDC/aUSDC with CRV. Max of 2M USDC/aUSDC sold, max of 2.65M CRV in
 contract CRVBadDebtRepayment {
     using SafeERC20 for IERC20;
 
-    uint256 public constant USD_CAP = 2_000_000e6;
+    uint256 public constant AUSD_CAP = 2_000_000e6;
     uint256 public constant CRV_CAP = 2_656_500e18;
     uint256 public totalCRVReceived;
-    uint256 public totalUSDCSold;
+    uint256 public totalAUSDCSold;
 
     IERC20 public constant CRV = IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
     IERC20 public constant USDC = IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
@@ -27,8 +30,8 @@ contract CRVBadDebtRepayment {
 
     /// CRV cap fulfilled
     error ExcessCRVAmountIn(uint256 amountLeft);
-    /// USDC cap fulfilled
-    error ExcessUSDCPurchased(uint256 amountLeft);
+    /// AUSDC cap fulfilled
+    error ExcessAUSDCPurchased(uint256 amountLeft);
     /// Not enough CRV in contract to repay bad debt
     error NotEnoughCRV(uint256 amount);
     /// Oracle price is 0 or lower
@@ -47,10 +50,10 @@ contract CRVBadDebtRepayment {
 
         amountOut = getAmountOut(amountIn);
         if (amountOut == 0) revert OnlyNonZeroAmount();
-        if (amountOut > availableUSDCToBeSold()) revert ExcessUSDCPurchased(availableUSDCToBeSold());
+        if (amountOut > availableAUSDCToBeSold()) revert ExcessAUSDCPurchased(availableAUSDCToBeSold());
 
         totalCRVReceived += amountIn;
-        totalUSDCSold += amountOut;
+        totalAUSDCSold += amountOut;
 
         CRV.safeTransferFrom(msg.sender, address(this), amountIn);
         if (toUnderlying) {
@@ -74,11 +77,11 @@ contract CRVBadDebtRepayment {
         return CRV_CAP - totalCRVReceived;
     }
 
-    /// @notice Returns how close to the 2,000,000 USDC amount cap we are
-    /// @return availableUSDCToBeSold the amount of USDC left to be sold
-    /// @dev Purchaser check this function before calling purchase() to see if there is USDC left to be sold
-    function availableUSDCToBeSold() public view returns (uint256) {
-        return USD_CAP - totalUSDCSold;
+    /// @notice Returns how close to the 2,000,000 aUSDC amount cap we are
+    /// @return availableAUSDCToBeSold the amount of aUSDC left to be sold
+    /// @dev Purchaser check this function before calling purchase() to see if there is aUSDC left to be sold
+    function availableAUSDCToBeSold() public view returns (uint256) {
+        return AUSD_CAP - totalAUSDCSold;
     }
 
     function getAmountOut(uint256 amountIn) public view returns (uint256 amountOut) {
@@ -87,6 +90,7 @@ contract CRVBadDebtRepayment {
             => amountOut = (amountCRVWei / 10^balDecimals) * (chainlinkPrice / chainlinkPrecision) * 10^usdcDecimals
             => amountOut = (amountCRVWei / 10^18) * (chainlinkPrice / 10^8) * 10^6
          */
+
         amountOut = (amountIn * getOraclePrice()) / 10**20;
         // 10 bps arbitrage incentive
         return (amountOut * 10010) / 10000;
@@ -101,8 +105,10 @@ contract CRVBadDebtRepayment {
     /// @notice Repays CRV debt on behalf of BAD_DEBTOR address
     /// @dev Check balance of contract before repaying to ensure it has enough funds
     function repay() external returns (uint256) {
-        if (IERC20(CRV).balanceOf(address(this)) < CRV_CAP) revert NotEnoughCRV(totalCRVReceived);
-        return AaveV2Ethereum.POOL.repay(address(CRV), type(uint256).max, 2, BAD_DEBTOR);
+        uint256 balance = IERC20(CRV).balanceOf(address(this));
+        if (balance < CRV_CAP) revert NotEnoughCRV(totalCRVReceived);
+        CRV.approve(address(AaveV2Ethereum.POOL), balance);
+        return AaveV2Ethereum.POOL.repay(address(CRV), balance, 2, BAD_DEBTOR);
     }
 
     /// @notice Transfer any tokens accidentally sent to this contract to Aave V2 Collector
