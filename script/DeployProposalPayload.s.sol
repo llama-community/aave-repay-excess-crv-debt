@@ -3,13 +3,14 @@ pragma solidity ^0.8.15;
 
 import "@forge-std/console.sol";
 import {Script} from "@forge-std/Script.sol";
+import {CRVBadDebtRepayment} from "../src/CRVBadDebtRepayment.sol";
 import {ProposalPayload} from "../src/ProposalPayload.sol";
 
 contract DeployProposalPayload is Script {
     function run() external {
         vm.startBroadcast();
-        ProposalPayload proposalPayload = new ProposalPayload();
-        console.log("Proposal Payload address", address(proposalPayload));
+        CRVBadDebtRepayment crvRepayment = new CRVBadDebtRepayment();
+        ProposalPayload proposalPayload = new ProposalPayload(address(crvRepayment));
         vm.stopBroadcast();
     }
 }

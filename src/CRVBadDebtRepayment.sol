@@ -21,14 +21,16 @@ contract CRVBadDebtRepayment {
     AggregatorV3Interface public constant CRV_USD_FEED =
         AggregatorV3Interface(0xCd627aA160A6fA45Eb793D19Ef54f5062F20f33f);
 
+    address public constant BAD_DEBTOR = 0x57E04786E231Af3343562C062E0d058F25daCE9E;
+
     event Purchase(address indexed tokenIn, address indexed tokenOut, uint256 amountIn, uint256 amountOut);
 
     /// CRV cap fulfilled
-    error ExcessCRVAmountIn();
+    error ExcessCRVAmountIn(uint256 amountLeft);
     /// USDC cap fulfilled
-    error ExcessUSDCPurchased();
+    error ExcessUSDCPurchased(uint256 amountLeft);
     /// Not enough CRV in contract to repay bad debt
-    error NotEnoughCRV();
+    error NotEnoughCRV(uint256 amount);
     /// Oracle price is 0 or lower
     error InvalidOracleAnswer();
     /// Need to request more than 0 tokens out
@@ -41,16 +43,16 @@ contract CRVBadDebtRepayment {
     /// @dev Purchaser has to approve BAL transfer before calling this function
     function purchase(uint256 amountIn, bool toUnderlying) external returns (uint256 amountOut) {
         if (amountIn == 0) revert OnlyNonZeroAmount();
-        if (amountIn > availableCRVToBeFilled()) revert ExcessCRVAmountIn();
+        if (amountIn > availableCRVToBeFilled()) revert ExcessCRVAmountIn(availableCRVToBeFilled());
 
         amountOut = getAmountOut(amountIn);
         if (amountOut == 0) revert OnlyNonZeroAmount();
-        if (amountIn > availableUSDCToBeSold()) revert ExcessUSDCPurchased();
+        if (amountOut > availableUSDCToBeSold()) revert ExcessUSDCPurchased(availableUSDCToBeSold());
 
         totalCRVReceived += amountIn;
         totalUSDCSold += amountOut;
 
-        CRV.safeTransferFrom(msg.sender, AaveV2Ethereum.COLLECTOR, amountIn);
+        CRV.safeTransferFrom(msg.sender, address(this), amountIn);
         if (toUnderlying) {
             AUSDC.safeTransferFrom(AaveV2Ethereum.COLLECTOR, address(this), amountOut);
             // Withdrawing entire aUSDC balance in this contract since we can't directly use 'amountOut' as
@@ -96,9 +98,11 @@ contract CRVBadDebtRepayment {
         return uint256(price);
     }
 
-    function repay() external {
-        if (IERC20(CRV).balanceOf(address(this)) < totalCRVReceived) revert NotEnoughCRV();
-        // pool.repay(CRV, CRV_CAP, variableInterest, 0x57e04786e231af3343562c062e0d058f25dace9e);
+    /// @notice Repays CRV debt on behalf of BAD_DEBTOR address
+    /// @dev Check balance of contract before repaying to ensure it has enough funds
+    function repay() external returns (uint256) {
+        if (IERC20(CRV).balanceOf(address(this)) < CRV_CAP) revert NotEnoughCRV(totalCRVReceived);
+        return AaveV2Ethereum.POOL.repay(address(CRV), type(uint256).max, 2, BAD_DEBTOR);
     }
 
     /// @notice Transfer any tokens accidentally sent to this contract to Aave V2 Collector
