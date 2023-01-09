@@ -12,8 +12,8 @@ import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 contract CRVBadDebtRepayment {
     using SafeERC20 for IERC20;
 
-    uint256 public constant AUSD_CAP = 2_000_000e6;
-    uint256 public constant CRV_CAP = 2_656_500e18;
+    uint256 public constant AUSDC_CAP = 2_000_000e6;
+    uint256 public constant CRV_CAP = 2_656_355e18;
     uint256 public totalCRVReceived;
     uint256 public totalAUSDCSold;
 
@@ -81,7 +81,7 @@ contract CRVBadDebtRepayment {
     /// @return availableAUSDCToBeSold the amount of aUSDC left to be sold
     /// @dev Purchaser check this function before calling purchase() to see if there is aUSDC left to be sold
     function availableAUSDCToBeSold() public view returns (uint256) {
-        return AUSD_CAP - totalAUSDCSold;
+        return AUSDC_CAP - totalAUSDCSold;
     }
 
     function getAmountOut(uint256 amountIn) public view returns (uint256) {

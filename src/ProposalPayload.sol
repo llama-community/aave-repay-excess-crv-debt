@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.17;
 
-import {IAaveEcosystemReserveController} from "./external/aave/IAaveEcosystemReserveController.sol";
 import {AaveV2Ethereum} from "@aave-address-book/AaveV2Ethereum.sol";
+import {AaveMisc} from "@aave-address-book/AaveMisc.sol";
 import {CRVBadDebtRepayment} from "./CRVBadDebtRepayment.sol";
 
 /**
@@ -24,14 +24,14 @@ contract ProposalPayload {
     /// @notice The AAVE governance executor calls this function to implement the proposal.
     function execute() external {
         // Approve the CRV Repayment contract to withdraw up to 2,000,000 units of AUSDC.
-        IAaveEcosystemReserveController(AaveV2Ethereum.COLLECTOR_CONTROLLER).approve(
+        AaveMisc.AAVE_ECOSYSTEM_RESERVE_CONTROLLER.approve(
             AaveV2Ethereum.COLLECTOR,
             AUSDC,
             address(crvRepayment),
-            crvRepayment.AUSD_CAP()
+            crvRepayment.AUSDC_CAP()
         );
         // Approve the CRV Repayment contract to spend CRV accumulated to repay bad debt
-        IAaveEcosystemReserveController(AaveV2Ethereum.COLLECTOR_CONTROLLER).approve(
+        AaveMisc.AAVE_ECOSYSTEM_RESERVE_CONTROLLER.approve(
             AaveV2Ethereum.COLLECTOR,
             CRV,
             address(crvRepayment),

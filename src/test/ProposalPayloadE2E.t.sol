@@ -45,7 +45,7 @@ contract ProposalPayloadE2E is Test {
         proposalPayload = new ProposalPayload(crvRepayment);
 
         // Create Proposal
-        vm.prank(AAVE_WHALE);
+        vm.prank(GovHelpers.AAVE_WHALE);
         proposalId = DeployMainnetProposal._deployMainnetProposal(
             address(proposalPayload),
             0x344d3181f08b3186228b93bac0005a3a961238164b8b06cbb5f0428a9180b8a7 // TODO: Replace with actual IPFS Hash
