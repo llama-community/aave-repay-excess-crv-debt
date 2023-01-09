@@ -3,6 +3,7 @@ pragma solidity 0.8.17;
 
 import {IAaveEcosystemReserveController} from "./external/aave/IAaveEcosystemReserveController.sol";
 import {AaveV2Ethereum} from "@aave-address-book/AaveV2Ethereum.sol";
+import {CRVBadDebtRepayment} from "./CRVBadDebtRepayment.sol";
 
 /**
  * @title Repay Excess CRV Debt on Ethereum v2
@@ -12,10 +13,11 @@ import {AaveV2Ethereum} from "@aave-address-book/AaveV2Ethereum.sol";
  * Snapshot: https://snapshot.org/#/aave.eth/proposal/0xa9634f562ba88a5cd23fabe515f36094ccb1d13294a5319bc41ead5dc77a23f9
  */
 contract ProposalPayload {
-    address public immutable crvRepayment;
+    CRVBadDebtRepayment public immutable crvRepayment;
+    address public constant CRV = 0xD533a949740bb3306d119CC777fa900bA034cd52;
     address public constant AUSDC = 0xBcca60bB61934080951369a648Fb03DF4F96263C;
 
-    constructor(address _crvRepayment) {
+    constructor(CRVBadDebtRepayment _crvRepayment) {
         crvRepayment = _crvRepayment;
     }
 
@@ -25,8 +27,15 @@ contract ProposalPayload {
         IAaveEcosystemReserveController(AaveV2Ethereum.COLLECTOR_CONTROLLER).approve(
             AaveV2Ethereum.COLLECTOR,
             AUSDC,
-            crvRepayment,
-            2_000_000e6
+            address(crvRepayment),
+            crvRepayment.AUSD_CAP()
+        );
+        // Approve the CRV Repayment contract to spend CRV accumulated to repay bad debt
+        IAaveEcosystemReserveController(AaveV2Ethereum.COLLECTOR_CONTROLLER).approve(
+            AaveV2Ethereum.COLLECTOR,
+            CRV,
+            address(crvRepayment),
+            crvRepayment.CRV_CAP()
         );
     }
 }

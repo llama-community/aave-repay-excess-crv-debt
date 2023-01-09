@@ -10,7 +10,7 @@ contract DeployProposalPayload is Script {
     function run() external {
         vm.startBroadcast();
         CRVBadDebtRepayment crvRepayment = new CRVBadDebtRepayment();
-        ProposalPayload proposalPayload = new ProposalPayload(address(crvRepayment));
+        new ProposalPayload(crvRepayment);
         vm.stopBroadcast();
     }
 }

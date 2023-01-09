@@ -40,10 +40,10 @@ contract CRVBadDebtRepayment {
     error OnlyNonZeroAmount();
 
     /// @notice Purchase USDC for CRV
-    /// @param amountIn Amount of BAL input
+    /// @param amountIn Amount of CRV input
     /// @param toUnderlying Whether to receive as USDC (true) or aUSDC (false)
     /// @return amountOut Amount of USDC received
-    /// @dev Purchaser has to approve BAL transfer before calling this function
+    /// @dev Purchaser has to approve CRV transfer before calling this function
     function purchase(uint256 amountIn, bool toUnderlying) external returns (uint256 amountOut) {
         if (amountIn == 0) revert OnlyNonZeroAmount();
         if (amountIn > availableCRVToBeFilled()) revert ExcessCRVAmountIn(availableCRVToBeFilled());
@@ -55,7 +55,7 @@ contract CRVBadDebtRepayment {
         totalCRVReceived += amountIn;
         totalAUSDCSold += amountOut;
 
-        CRV.safeTransferFrom(msg.sender, address(this), amountIn);
+        CRV.safeTransferFrom(msg.sender, AaveV2Ethereum.COLLECTOR, amountIn);
         if (toUnderlying) {
             AUSDC.safeTransferFrom(AaveV2Ethereum.COLLECTOR, address(this), amountOut);
             // Withdrawing entire aUSDC balance in this contract since we can't directly use 'amountOut' as
@@ -84,14 +84,14 @@ contract CRVBadDebtRepayment {
         return AUSD_CAP - totalAUSDCSold;
     }
 
-    function getAmountOut(uint256 amountIn) public view returns (uint256 amountOut) {
+    function getAmountOut(uint256 amountIn) public view returns (uint256) {
         /** 
             The actual calculation is a collapsed version of this to prevent precision loss:
             => amountOut = (amountCRVWei / 10^balDecimals) * (chainlinkPrice / chainlinkPrecision) * 10^usdcDecimals
             => amountOut = (amountCRVWei / 10^18) * (chainlinkPrice / 10^8) * 10^6
          */
 
-        amountOut = (amountIn * getOraclePrice()) / 10**20;
+        uint256 amountOut = (amountIn * getOraclePrice()) / 10**20;
         // 10 bps arbitrage incentive
         return (amountOut * 10010) / 10000;
     }
@@ -105,10 +105,10 @@ contract CRVBadDebtRepayment {
     /// @notice Repays CRV debt on behalf of BAD_DEBTOR address
     /// @dev Check balance of contract before repaying to ensure it has enough funds
     function repay() external returns (uint256) {
-        uint256 balance = IERC20(CRV).balanceOf(address(this));
-        if (balance < CRV_CAP) revert NotEnoughCRV(totalCRVReceived);
-        CRV.approve(address(AaveV2Ethereum.POOL), balance);
-        return AaveV2Ethereum.POOL.repay(address(CRV), balance, 2, BAD_DEBTOR);
+        if (totalCRVReceived < CRV_CAP) revert NotEnoughCRV(totalCRVReceived);
+        CRV.approve(address(AaveV2Ethereum.POOL), totalCRVReceived);
+        CRV.safeTransferFrom(AaveV2Ethereum.COLLECTOR, address(this), totalCRVReceived);
+        return AaveV2Ethereum.POOL.repay(address(CRV), totalCRVReceived, 2, BAD_DEBTOR);
     }
 
     /// @notice Transfer any tokens accidentally sent to this contract to Aave V2 Collector

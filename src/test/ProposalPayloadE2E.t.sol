@@ -42,7 +42,7 @@ contract ProposalPayloadE2E is Test {
         crvRepayment = new CRVBadDebtRepayment();
 
         // Deploy Payload
-        proposalPayload = new ProposalPayload(address(crvRepayment));
+        proposalPayload = new ProposalPayload(crvRepayment);
 
         // Create Proposal
         vm.prank(AAVE_WHALE);
