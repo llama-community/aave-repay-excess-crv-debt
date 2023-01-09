@@ -140,7 +140,7 @@ contract ProposalPayloadE2E is Test {
 
         // Compensating for +1/-1 precision issues when rounding, mainly on aTokens
         assertApproxEqAbs(AUSDC.balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorAusdcBalance - ausdcAmountOut, 1);
-        assertEq(CRV.balanceOf(address(crvRepayment)), initialCollectorCrvBalance + CRV_AMOUNT_IN);
+        assertEq(CRV.balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorCrvBalance + CRV_AMOUNT_IN);
         assertEq(USDC.balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorUsdcBalance);
         // Compensating for +1/-1 precision issues when rounding, mainly on aTokens
         assertApproxEqAbs(AUSDC.balanceOf(CRV_WHALE), initialPurchaserAusdcBalance + ausdcAmountOut, 1);
@@ -173,7 +173,7 @@ contract ProposalPayloadE2E is Test {
         // Aave V2 Collector gets some additional aTokens minted to it due to withdrawal happening in the purchase() function
         // see: https://github.com/aave/protocol-v2/blob/baeb455fad42d3160d571bd8d3a795948b72dd85/contracts/protocol/libraries/logic/ReserveLogic.sol#L265-L325
         assertGe(AUSDC.balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorUsdcBalance - usdcAmountOut);
-        assertEq(CRV.balanceOf(address(crvRepayment)), initialCollectorCrvBalance + CRV_AMOUNT_IN);
+        assertEq(CRV.balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorCrvBalance + CRV_AMOUNT_IN);
         assertEq(USDC.balanceOf(CRV_WHALE), initialPurchaserUsdcBalance + usdcAmountOut);
         assertEq(CRV.balanceOf(CRV_WHALE), initialPurchaserCrvBalance - CRV_AMOUNT_IN);
 
@@ -297,7 +297,7 @@ contract ProposalPayloadE2E is Test {
 
         // Compensating for +1/-1 precision issues when rounding, mainly on aTokens
         assertApproxEqAbs(AUSDC.balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorAusdcBalance - ausdcAmountOut, 1);
-        assertEq(CRV.balanceOf(address(crvRepayment)), initialCollectorCrvBalance + amount);
+        assertEq(CRV.balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorCrvBalance + amount);
         // Compensating for +1/-1 precision issues when rounding, mainly on aTokens
         assertApproxEqAbs(AUSDC.balanceOf(CRV_WHALE), initialPurchaserAusdcBalance + ausdcAmountOut, 1);
         assertEq(CRV.balanceOf(CRV_WHALE), initialPurchaserCrvBalance - amount);
@@ -329,7 +329,7 @@ contract ProposalPayloadE2E is Test {
         // Aave V2 Collector gets some additional aTokens minted to it due to withdrawal happening in the purchase() function
         // see: https://github.com/aave/protocol-v2/blob/baeb455fad42d3160d571bd8d3a795948b72dd85/contracts/protocol/libraries/logic/ReserveLogic.sol#L265-L325
         assertGe(AUSDC.balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorAusdcBalance - usdcAmountOut);
-        assertEq(CRV.balanceOf(address(crvRepayment)), initialCollectorCrvBalance + amount);
+        assertEq(CRV.balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorCrvBalance + amount);
         assertEq(USDC.balanceOf(CRV_WHALE), initialPurchaserUsdcBalance + usdcAmountOut);
         assertEq(CRV.balanceOf(CRV_WHALE), initialPurchaserCrvBalance - amount);
 
