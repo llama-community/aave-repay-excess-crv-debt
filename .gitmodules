@@ -13,3 +13,6 @@
 [submodule "lib/protocol-v2"]
 	path = lib/protocol-v2
 	url = https://github.com/aave/protocol-v2
+[submodule "lib/chainlink"]
+	path = lib/chainlink
+	url = https://github.com/smartcontractkit/chainlink
