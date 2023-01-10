@@ -11,12 +11,11 @@ import {CRVBadDebtRepayment} from "../CRVBadDebtRepayment.sol";
 import {DeployMainnetProposal} from "../../script/DeployMainnetProposal.s.sol";
 import {IERC20} from "@openzeppelin/token/ERC20/IERC20.sol";
 import {AaveV2Ethereum} from "@aave-address-book/AaveV2Ethereum.sol";
-import {AggregatorV3Interface} from "../external/AggregatorV3Interface.sol";
+import {AggregatorV3Interface} from "@chainlink/interfaces/AggregatorV3Interface.sol";
 
 contract ProposalPayloadE2E is Test {
     event Purchase(address indexed tokenIn, address indexed tokenOut, uint256 amountIn, uint256 amountOut);
 
-    address public constant AAVE_WHALE = 0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8;
     address public constant CRV_WHALE = 0x28C6c06298d514Db089934071355E5743bf21d60;
     address public constant USDC_WHALE = 0x55FE002aefF02F77364de339a1292923A15844B8;
     address public constant ETH_WHALE = 0xF977814e90dA44bFA03b6295A0616a897441aceC;
@@ -61,7 +60,7 @@ contract ProposalPayloadE2E is Test {
         // Pass vote and execute proposal
         GovHelpers.passVoteAndExecute(vm, proposalId);
 
-        assertEq(AUSDC.allowance(AaveV2Ethereum.COLLECTOR, address(crvRepayment)), crvRepayment.AUSD_CAP());
+        assertEq(AUSDC.allowance(AaveV2Ethereum.COLLECTOR, address(crvRepayment)), crvRepayment.AUSDC_CAP());
     }
 
     // /************************************
@@ -112,7 +111,7 @@ contract ProposalPayloadE2E is Test {
 
         vm.startPrank(CRV_WHALE);
         CRV.approve(address(crvRepayment), CRV_AMOUNT_IN);
-        vm.expectRevert(abi.encodeWithSelector(CRVBadDebtRepayment.ExcessCRVAmountIn.selector, 6_500e18));
+        vm.expectRevert(abi.encodeWithSelector(CRVBadDebtRepayment.ExcessCRVAmountIn.selector, 6_355e18));
         crvRepayment.purchase(CRV_AMOUNT_IN, false);
         vm.stopPrank();
     }
@@ -380,11 +379,11 @@ contract ProposalPayloadE2E is Test {
         vm.startPrank(CRV_WHALE);
         CRV.approve(address(crvRepayment), 2_656_500e18);
 
-        crvRepayment.purchase(2_656_500e18, false);
+        crvRepayment.purchase(2_656_355e18, false);
         vm.stopPrank();
 
         uint256 amountPaid = crvRepayment.repay();
 
-        assertEq(amountPaid, 2_656_500e18);
+        assertEq(amountPaid, 2_656_355e18);
     }
 }

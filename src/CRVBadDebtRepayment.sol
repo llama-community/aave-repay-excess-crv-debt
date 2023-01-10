@@ -2,7 +2,7 @@
 pragma solidity 0.8.17;
 
 import {AaveV2Ethereum} from "@aave-address-book/AaveV2Ethereum.sol";
-import {AggregatorV3Interface} from "./external/AggregatorV3Interface.sol";
+import {AggregatorV3Interface} from "@chainlink/interfaces/AggregatorV3Interface.sol";
 import {IERC20} from "@openzeppelin/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
