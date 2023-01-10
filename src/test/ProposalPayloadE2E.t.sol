@@ -116,6 +116,21 @@ contract ProposalPayloadE2E is Test {
         vm.stopPrank();
     }
 
+    function testPurchaseUsingUSDCCeilingHit() public {
+        // Pass vote and execute proposal
+        GovHelpers.passVoteAndExecute(vm, proposalId);
+
+        // totalAUSDCSold is storage slot 1
+        // Setting current totalCRVReceived to 1,900,000 aUSDC
+        vm.store(address(crvRepayment), bytes32(uint256(1)), bytes32(uint256(1_990_000e6)));
+
+        vm.startPrank(CRV_WHALE);
+        CRV.approve(address(crvRepayment), CRV_AMOUNT_IN);
+        vm.expectRevert(abi.encodeWithSelector(CRVBadDebtRepayment.ExcessAUSDCPurchased.selector, 10_000e6));
+        crvRepayment.purchase(CRV_AMOUNT_IN, false);
+        vm.stopPrank();
+    }
+
     function testPurchaseWithdrawFromAaveFalse() public {
         // Pass vote and execute proposal
         GovHelpers.passVoteAndExecute(vm, proposalId);
