@@ -16,23 +16,15 @@ import {AggregatorV3Interface} from "@chainlink/interfaces/AggregatorV3Interface
 contract ProposalPayloadE2E is Test {
     event Purchase(address indexed tokenIn, address indexed tokenOut, uint256 amountIn, uint256 amountOut);
 
+    CRVBadDebtRepayment public crvRepayment;
+    ProposalPayload public proposalPayload;
+
     address public constant CRV_WHALE = 0x28C6c06298d514Db089934071355E5743bf21d60;
     address public constant USDC_WHALE = 0x55FE002aefF02F77364de339a1292923A15844B8;
     address public constant ETH_WHALE = 0xF977814e90dA44bFA03b6295A0616a897441aceC;
 
-    uint256 public proposalId;
-
-    IERC20 public constant CRV = IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
-    IERC20 public constant AUSDC = IERC20(0xBcca60bB61934080951369a648Fb03DF4F96263C);
-    IERC20 public constant USDC = IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
-
-    AggregatorV3Interface public constant CRV_USD_FEED =
-        AggregatorV3Interface(0xCd627aA160A6fA45Eb793D19Ef54f5062F20f33f);
-
     uint256 public constant CRV_AMOUNT_IN = 50_000e18;
-
-    CRVBadDebtRepayment public crvRepayment;
-    ProposalPayload public proposalPayload;
+    uint256 public proposalId;
 
     function setUp() public {
         vm.createSelectFork(vm.rpcUrl("mainnet"), 16341536);
@@ -55,14 +47,18 @@ contract ProposalPayloadE2E is Test {
     }
 
     function testExecuteProposal() public {
-        assertEq(AUSDC.allowance(AaveV2Ethereum.COLLECTOR, address(crvRepayment)), 0);
+        assertEq(crvRepayment.AUSDC().allowance(AaveV2Ethereum.COLLECTOR, address(crvRepayment)), 0);
 
         // Pass vote and execute proposal
         GovHelpers.passVoteAndExecute(vm, proposalId);
 
-        assertEq(AUSDC.balanceOf(AaveV2Ethereum.COLLECTOR), 5591098913952);
-        assertEq(USDC.balanceOf(AaveV2Ethereum.COLLECTOR), 0);
-        assertEq(AUSDC.allowance(AaveV2Ethereum.COLLECTOR, address(crvRepayment)), crvRepayment.AUSDC_CAP());
+        assertEq(crvRepayment.AUSDC().balanceOf(AaveV2Ethereum.COLLECTOR), 5591098913952);
+        assertEq(crvRepayment.USDC().balanceOf(AaveV2Ethereum.COLLECTOR), 0);
+        assertEq(
+            crvRepayment.AUSDC().allowance(AaveV2Ethereum.COLLECTOR, address(crvRepayment)),
+            crvRepayment.AUSDC_CAP()
+        );
+        assertEq(crvRepayment.CRV().allowance(AaveV2Ethereum.COLLECTOR, address(crvRepayment)), crvRepayment.CRV_CAP());
     }
 
     // /************************************
@@ -73,15 +69,7 @@ contract ProposalPayloadE2E is Test {
         // Pass vote and execute proposal
         GovHelpers.passVoteAndExecute(vm, proposalId);
 
-        assertLe(CRV.balanceOf(AaveV2Ethereum.COLLECTOR), crvRepayment.CRV_CAP());
-    }
-
-    function testUSDCaUSDCAmount() public {
-        // Pass vote and execute proposal
-        GovHelpers.passVoteAndExecute(vm, proposalId);
-
-        assertEq(AUSDC.balanceOf(AaveV2Ethereum.COLLECTOR), 5591098913952);
-        assertEq(USDC.balanceOf(AaveV2Ethereum.COLLECTOR), 0);
+        assertLe(crvRepayment.CRV().balanceOf(AaveV2Ethereum.COLLECTOR), crvRepayment.CRV_CAP());
     }
 
     function testPurchaseZeroAmountIn() public {
@@ -112,7 +100,7 @@ contract ProposalPayloadE2E is Test {
         assertLe(crvRepayment.totalCRVReceived(), crvRepayment.CRV_CAP());
 
         vm.startPrank(CRV_WHALE);
-        CRV.approve(address(crvRepayment), CRV_AMOUNT_IN);
+        crvRepayment.CRV().approve(address(crvRepayment), CRV_AMOUNT_IN);
         vm.expectRevert(abi.encodeWithSelector(CRVBadDebtRepayment.ExcessCRVAmountIn.selector, 6_355e18));
         crvRepayment.purchase(CRV_AMOUNT_IN, false);
         vm.stopPrank();
@@ -127,7 +115,7 @@ contract ProposalPayloadE2E is Test {
         vm.store(address(crvRepayment), bytes32(uint256(1)), bytes32(uint256(1_990_000e6)));
 
         vm.startPrank(CRV_WHALE);
-        CRV.approve(address(crvRepayment), CRV_AMOUNT_IN);
+        crvRepayment.CRV().approve(address(crvRepayment), CRV_AMOUNT_IN);
         vm.expectRevert(abi.encodeWithSelector(CRVBadDebtRepayment.ExcessAUSDCPurchased.selector, 10_000e6));
         crvRepayment.purchase(CRV_AMOUNT_IN, false);
         vm.stopPrank();
@@ -138,30 +126,34 @@ contract ProposalPayloadE2E is Test {
         GovHelpers.passVoteAndExecute(vm, proposalId);
 
         vm.startPrank(CRV_WHALE);
-        CRV.approve(address(crvRepayment), CRV_AMOUNT_IN);
+        crvRepayment.CRV().approve(address(crvRepayment), CRV_AMOUNT_IN);
 
-        uint256 initialCollectorAusdcBalance = AUSDC.balanceOf(AaveV2Ethereum.COLLECTOR);
-        uint256 initialCollectorUsdcBalance = USDC.balanceOf(AaveV2Ethereum.COLLECTOR);
-        uint256 initialCollectorCrvBalance = CRV.balanceOf(address(crvRepayment));
-        uint256 initialPurchaserAusdcBalance = AUSDC.balanceOf(CRV_WHALE);
-        uint256 initialPurchaserUsdcBalance = USDC.balanceOf(CRV_WHALE);
-        uint256 initialPurchaserCrvBalance = CRV.balanceOf(CRV_WHALE);
+        uint256 initialCollectorAusdcBalance = crvRepayment.AUSDC().balanceOf(AaveV2Ethereum.COLLECTOR);
+        uint256 initialCollectorUsdcBalance = crvRepayment.USDC().balanceOf(AaveV2Ethereum.COLLECTOR);
+        uint256 initialCollectorCrvBalance = crvRepayment.CRV().balanceOf(address(crvRepayment));
+        uint256 initialPurchaserAusdcBalance = crvRepayment.AUSDC().balanceOf(CRV_WHALE);
+        uint256 initialPurchaserUsdcBalance = crvRepayment.USDC().balanceOf(CRV_WHALE);
+        uint256 initialPurchaserCrvBalance = crvRepayment.CRV().balanceOf(CRV_WHALE);
 
         assertEq(crvRepayment.totalAUSDCSold(), 0);
         assertEq(crvRepayment.totalCRVReceived(), 0);
 
         vm.expectEmit(true, true, false, true);
-        emit Purchase(address(CRV), address(AUSDC), CRV_AMOUNT_IN, 27347320000);
+        emit Purchase(address(crvRepayment.CRV()), address(crvRepayment.AUSDC()), CRV_AMOUNT_IN, 27347320000);
         uint256 ausdcAmountOut = crvRepayment.purchase(CRV_AMOUNT_IN, false);
 
         // Compensating for +1/-1 precision issues when rounding, mainly on aTokens
-        assertApproxEqAbs(AUSDC.balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorAusdcBalance - ausdcAmountOut, 1);
-        assertEq(CRV.balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorCrvBalance + CRV_AMOUNT_IN);
-        assertEq(USDC.balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorUsdcBalance);
+        assertApproxEqAbs(
+            crvRepayment.AUSDC().balanceOf(AaveV2Ethereum.COLLECTOR),
+            initialCollectorAusdcBalance - ausdcAmountOut,
+            1
+        );
+        assertEq(crvRepayment.CRV().balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorCrvBalance + CRV_AMOUNT_IN);
+        assertEq(crvRepayment.USDC().balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorUsdcBalance);
         // Compensating for +1/-1 precision issues when rounding, mainly on aTokens
-        assertApproxEqAbs(AUSDC.balanceOf(CRV_WHALE), initialPurchaserAusdcBalance + ausdcAmountOut, 1);
-        assertEq(CRV.balanceOf(CRV_WHALE), initialPurchaserCrvBalance - CRV_AMOUNT_IN);
-        assertEq(USDC.balanceOf(CRV_WHALE), initialPurchaserUsdcBalance);
+        assertApproxEqAbs(crvRepayment.AUSDC().balanceOf(CRV_WHALE), initialPurchaserAusdcBalance + ausdcAmountOut, 1);
+        assertEq(crvRepayment.CRV().balanceOf(CRV_WHALE), initialPurchaserCrvBalance - CRV_AMOUNT_IN);
+        assertEq(crvRepayment.USDC().balanceOf(CRV_WHALE), initialPurchaserUsdcBalance);
 
         assertEq(crvRepayment.totalAUSDCSold(), ausdcAmountOut);
         assertEq(crvRepayment.totalCRVReceived(), CRV_AMOUNT_IN);
@@ -172,26 +164,29 @@ contract ProposalPayloadE2E is Test {
         GovHelpers.passVoteAndExecute(vm, proposalId);
 
         vm.startPrank(CRV_WHALE);
-        CRV.approve(address(crvRepayment), CRV_AMOUNT_IN);
+        crvRepayment.CRV().approve(address(crvRepayment), CRV_AMOUNT_IN);
 
-        uint256 initialCollectorAusdcBalance = AUSDC.balanceOf(AaveV2Ethereum.COLLECTOR);
-        uint256 initialCollectorCrvBalance = CRV.balanceOf(address(crvRepayment));
-        uint256 initialPurchaserUsdcBalance = USDC.balanceOf(CRV_WHALE);
-        uint256 initialPurchaserCrvBalance = CRV.balanceOf(CRV_WHALE);
+        uint256 initialCollectorAusdcBalance = crvRepayment.AUSDC().balanceOf(AaveV2Ethereum.COLLECTOR);
+        uint256 initialCollectorCrvBalance = crvRepayment.CRV().balanceOf(address(crvRepayment));
+        uint256 initialPurchaserUsdcBalance = crvRepayment.USDC().balanceOf(CRV_WHALE);
+        uint256 initialPurchaserCrvBalance = crvRepayment.CRV().balanceOf(CRV_WHALE);
 
         assertEq(crvRepayment.totalAUSDCSold(), 0);
         assertEq(crvRepayment.totalCRVReceived(), 0);
 
         vm.expectEmit(true, true, false, true);
-        emit Purchase(address(CRV), address(USDC), CRV_AMOUNT_IN, 27347320000);
+        emit Purchase(address(crvRepayment.CRV()), address(crvRepayment.USDC()), CRV_AMOUNT_IN, 27347320000);
         uint256 usdcAmountOut = crvRepayment.purchase(CRV_AMOUNT_IN, true);
 
         // Aave V2 Collector gets some additional aTokens minted to it due to withdrawal happening in the purchase() function
         // see: https://github.com/aave/protocol-v2/blob/baeb455fad42d3160d571bd8d3a795948b72dd85/contracts/protocol/libraries/logic/ReserveLogic.sol#L265-L325
-        assertGe(AUSDC.balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorAusdcBalance - usdcAmountOut);
-        assertEq(CRV.balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorCrvBalance + CRV_AMOUNT_IN);
-        assertEq(USDC.balanceOf(CRV_WHALE), initialPurchaserUsdcBalance + usdcAmountOut);
-        assertEq(CRV.balanceOf(CRV_WHALE), initialPurchaserCrvBalance - CRV_AMOUNT_IN);
+        assertGe(
+            crvRepayment.AUSDC().balanceOf(AaveV2Ethereum.COLLECTOR),
+            initialCollectorAusdcBalance - usdcAmountOut
+        );
+        assertEq(crvRepayment.CRV().balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorCrvBalance + CRV_AMOUNT_IN);
+        assertEq(crvRepayment.USDC().balanceOf(CRV_WHALE), initialPurchaserUsdcBalance + usdcAmountOut);
+        assertEq(crvRepayment.CRV().balanceOf(CRV_WHALE), initialPurchaserCrvBalance - CRV_AMOUNT_IN);
 
         // Compensating for +1/-1 precision issues when rounding while transferring aTokens in the purchase() function
         assertApproxEqAbs(crvRepayment.totalAUSDCSold(), usdcAmountOut, 1);
@@ -206,8 +201,8 @@ contract ProposalPayloadE2E is Test {
     function testOraclePriceZeroAmount() public {
         // Mocking returned value of Price = 0
         vm.mockCall(
-            address(CRV_USD_FEED),
-            abi.encodeWithSelector(CRV_USD_FEED.latestRoundData.selector),
+            address(crvRepayment.CRV_USD_FEED()),
+            abi.encodeWithSelector(crvRepayment.CRV_USD_FEED().latestRoundData.selector),
             abi.encode(uint80(10), int256(0), uint256(2), uint256(3), uint80(10))
         );
 
@@ -220,8 +215,8 @@ contract ProposalPayloadE2E is Test {
     function testOraclePriceNegativeAmount() public {
         // Mocking returned value of Price < 0
         vm.mockCall(
-            address(CRV_USD_FEED),
-            abi.encodeWithSelector(CRV_USD_FEED.latestRoundData.selector),
+            address(crvRepayment.CRV_USD_FEED()),
+            abi.encodeWithSelector(crvRepayment.CRV_USD_FEED().latestRoundData.selector),
             abi.encode(uint80(10), int256(-1), uint256(2), uint256(3), uint80(10))
         );
 
@@ -232,8 +227,8 @@ contract ProposalPayloadE2E is Test {
     }
 
     function testGetOraclePrice() public {
-        assertEq(CRV_USD_FEED.decimals(), 8);
-        (, int256 price, , , ) = CRV_USD_FEED.latestRoundData();
+        assertEq(crvRepayment.CRV_USD_FEED().decimals(), 8);
+        (, int256 price, , , ) = crvRepayment.CRV_USD_FEED().latestRoundData();
         assertEq(uint256(price), 54640000);
         assertEq(crvRepayment.getOraclePrice(), 54640000);
     }
@@ -243,48 +238,70 @@ contract ProposalPayloadE2E is Test {
         // CRV/USD Chainlink price feed updates every 24 hours ~= 6500 blocks
         for (uint256 i = 0; i < 5000; i++) {
             vm.roll(block.number - 10);
-            (, int256 price, , , ) = CRV_USD_FEED.latestRoundData();
+            (, int256 price, , , ) = crvRepayment.CRV_USD_FEED().latestRoundData();
             assertEq(crvRepayment.getOraclePrice(), uint256(price));
         }
     }
 
-    function testSendEthtoBondingCurve() public {
+    function testSendEthtoCRVBadDebtRepayment() public {
         // Testing that you can't send ETH to the contract directly since there's no fallback() or receive() function
         vm.startPrank(ETH_WHALE);
         (bool success, ) = address(crvRepayment).call{value: 1 ether}("");
         assertTrue(!success);
     }
 
+    function testRepayNoCRV() public {
+        GovHelpers.passVoteAndExecute(vm, proposalId);
+
+        vm.expectRevert(CRVBadDebtRepayment.NoCRVForRepayment.selector);
+
+        crvRepayment.repay();
+    }
+
+    function testRepaySuccessful() public {
+        GovHelpers.passVoteAndExecute(vm, proposalId);
+
+        vm.startPrank(CRV_WHALE);
+        crvRepayment.CRV().approve(address(crvRepayment), 2_656_500e18);
+
+        crvRepayment.purchase(2_656_355e18, false);
+        vm.stopPrank();
+
+        uint256 amountPaid = crvRepayment.repay();
+
+        assertEq(amountPaid, 2_656_355e18);
+    }
+
     function testRescueTokens() public {
-        assertEq(CRV.balanceOf(address(crvRepayment)), 0);
-        assertEq(USDC.balanceOf(address(crvRepayment)), 0);
+        assertEq(crvRepayment.CRV().balanceOf(address(crvRepayment)), 0);
+        assertEq(crvRepayment.USDC().balanceOf(address(crvRepayment)), 0);
 
         uint256 crvAmount = 10_000e18;
         uint256 usdcAmount = 10_000e6;
 
         vm.startPrank(CRV_WHALE);
-        CRV.transfer(address(crvRepayment), crvAmount);
+        crvRepayment.CRV().transfer(address(crvRepayment), crvAmount);
         vm.stopPrank();
 
         vm.startPrank(USDC_WHALE);
-        USDC.transfer(address(crvRepayment), usdcAmount);
+        crvRepayment.USDC().transfer(address(crvRepayment), usdcAmount);
         vm.stopPrank();
 
-        assertEq(CRV.balanceOf(address(crvRepayment)), crvAmount);
-        assertEq(USDC.balanceOf(address(crvRepayment)), usdcAmount);
+        assertEq(crvRepayment.CRV().balanceOf(address(crvRepayment)), crvAmount);
+        assertEq(crvRepayment.USDC().balanceOf(address(crvRepayment)), usdcAmount);
 
-        uint256 initialCollectorCrvBalance = CRV.balanceOf(AaveV2Ethereum.COLLECTOR);
-        uint256 initialCollectorUsdcBalance = USDC.balanceOf(AaveV2Ethereum.COLLECTOR);
+        uint256 initialCollectorCrvBalance = crvRepayment.CRV().balanceOf(AaveV2Ethereum.COLLECTOR);
+        uint256 initialCollectorUsdcBalance = crvRepayment.USDC().balanceOf(AaveV2Ethereum.COLLECTOR);
 
         address[] memory tokens = new address[](2);
-        tokens[0] = address(CRV);
-        tokens[1] = address(USDC);
+        tokens[0] = address(crvRepayment.CRV());
+        tokens[1] = address(crvRepayment.USDC());
         crvRepayment.rescueTokens(tokens);
 
-        assertEq(CRV.balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorCrvBalance + crvAmount);
-        assertEq(USDC.balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorUsdcBalance + usdcAmount);
-        assertEq(CRV.balanceOf(address(crvRepayment)), 0);
-        assertEq(USDC.balanceOf(address(crvRepayment)), 0);
+        assertEq(crvRepayment.CRV().balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorCrvBalance + crvAmount);
+        assertEq(crvRepayment.USDC().balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorUsdcBalance + usdcAmount);
+        assertEq(crvRepayment.CRV().balanceOf(address(crvRepayment)), 0);
+        assertEq(crvRepayment.USDC().balanceOf(address(crvRepayment)), 0);
     }
 
     /*****************************************
@@ -299,12 +316,12 @@ contract ProposalPayloadE2E is Test {
         vm.assume(amount >= 2e18 && amount <= crvRepayment.CRV_CAP());
 
         vm.startPrank(CRV_WHALE);
-        CRV.approve(address(crvRepayment), amount);
+        crvRepayment.CRV().approve(address(crvRepayment), amount);
 
-        uint256 initialCollectorAusdcBalance = AUSDC.balanceOf(AaveV2Ethereum.COLLECTOR);
-        uint256 initialCollectorCrvBalance = CRV.balanceOf(AaveV2Ethereum.COLLECTOR);
-        uint256 initialPurchaserAusdcBalance = AUSDC.balanceOf(CRV_WHALE);
-        uint256 initialPurchaserCrvBalance = CRV.balanceOf(CRV_WHALE);
+        uint256 initialCollectorAusdcBalance = crvRepayment.AUSDC().balanceOf(AaveV2Ethereum.COLLECTOR);
+        uint256 initialCollectorCrvBalance = crvRepayment.CRV().balanceOf(AaveV2Ethereum.COLLECTOR);
+        uint256 initialPurchaserAusdcBalance = crvRepayment.AUSDC().balanceOf(CRV_WHALE);
+        uint256 initialPurchaserCrvBalance = crvRepayment.CRV().balanceOf(CRV_WHALE);
 
         assertEq(crvRepayment.totalAUSDCSold(), 0);
         assertEq(crvRepayment.totalCRVReceived(), 0);
@@ -312,11 +329,15 @@ contract ProposalPayloadE2E is Test {
         uint256 ausdcAmountOut = crvRepayment.purchase(amount, false);
 
         // Compensating for +1/-1 precision issues when rounding, mainly on aTokens
-        assertApproxEqAbs(AUSDC.balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorAusdcBalance - ausdcAmountOut, 1);
-        assertEq(CRV.balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorCrvBalance + amount);
+        assertApproxEqAbs(
+            crvRepayment.AUSDC().balanceOf(AaveV2Ethereum.COLLECTOR),
+            initialCollectorAusdcBalance - ausdcAmountOut,
+            1
+        );
+        assertEq(crvRepayment.CRV().balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorCrvBalance + amount);
         // Compensating for +1/-1 precision issues when rounding, mainly on aTokens
-        assertApproxEqAbs(AUSDC.balanceOf(CRV_WHALE), initialPurchaserAusdcBalance + ausdcAmountOut, 1);
-        assertEq(CRV.balanceOf(CRV_WHALE), initialPurchaserCrvBalance - amount);
+        assertApproxEqAbs(crvRepayment.AUSDC().balanceOf(CRV_WHALE), initialPurchaserAusdcBalance + ausdcAmountOut, 1);
+        assertEq(crvRepayment.CRV().balanceOf(CRV_WHALE), initialPurchaserCrvBalance - amount);
 
         assertEq(crvRepayment.totalAUSDCSold(), ausdcAmountOut);
         assertEq(crvRepayment.totalCRVReceived(), amount);
@@ -330,12 +351,12 @@ contract ProposalPayloadE2E is Test {
         vm.assume(amount >= 2e18 && amount <= crvRepayment.CRV_CAP());
 
         vm.startPrank(CRV_WHALE);
-        CRV.approve(address(crvRepayment), amount);
+        crvRepayment.CRV().approve(address(crvRepayment), amount);
 
-        uint256 initialCollectorAusdcBalance = AUSDC.balanceOf(AaveV2Ethereum.COLLECTOR);
-        uint256 initialCollectorCrvBalance = CRV.balanceOf(AaveV2Ethereum.COLLECTOR);
-        uint256 initialPurchaserUsdcBalance = USDC.balanceOf(CRV_WHALE);
-        uint256 initialPurchaserCrvBalance = CRV.balanceOf(CRV_WHALE);
+        uint256 initialCollectorAusdcBalance = crvRepayment.AUSDC().balanceOf(AaveV2Ethereum.COLLECTOR);
+        uint256 initialCollectorCrvBalance = crvRepayment.CRV().balanceOf(AaveV2Ethereum.COLLECTOR);
+        uint256 initialPurchaserUsdcBalance = crvRepayment.USDC().balanceOf(CRV_WHALE);
+        uint256 initialPurchaserCrvBalance = crvRepayment.CRV().balanceOf(CRV_WHALE);
 
         assertEq(crvRepayment.totalAUSDCSold(), 0);
         assertEq(crvRepayment.totalCRVReceived(), 0);
@@ -344,10 +365,14 @@ contract ProposalPayloadE2E is Test {
 
         // Aave V2 Collector gets some additional aTokens minted to it due to withdrawal happening in the purchase() function
         // see: https://github.com/aave/protocol-v2/blob/baeb455fad42d3160d571bd8d3a795948b72dd85/contracts/protocol/libraries/logic/ReserveLogic.sol#L265-L325
-        assertApproxEqAbs(AUSDC.balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorAusdcBalance - usdcAmountOut, 1);
-        assertEq(CRV.balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorCrvBalance + amount);
-        assertEq(USDC.balanceOf(CRV_WHALE), initialPurchaserUsdcBalance + usdcAmountOut);
-        assertEq(CRV.balanceOf(CRV_WHALE), initialPurchaserCrvBalance - amount);
+        assertApproxEqAbs(
+            crvRepayment.AUSDC().balanceOf(AaveV2Ethereum.COLLECTOR),
+            initialCollectorAusdcBalance - usdcAmountOut,
+            1
+        );
+        assertEq(crvRepayment.CRV().balanceOf(AaveV2Ethereum.COLLECTOR), initialCollectorCrvBalance + amount);
+        assertEq(crvRepayment.USDC().balanceOf(CRV_WHALE), initialPurchaserUsdcBalance + usdcAmountOut);
+        assertEq(crvRepayment.CRV().balanceOf(CRV_WHALE), initialPurchaserCrvBalance - amount);
 
         // Compensating for +1/-1 precision issues when rounding while transferring aTokens in the purchase() function
         assertApproxEqAbs(crvRepayment.totalAUSDCSold(), usdcAmountOut, 1);
@@ -359,8 +384,8 @@ contract ProposalPayloadE2E is Test {
 
         // Mocking returned value of price <=0
         vm.mockCall(
-            address(CRV_USD_FEED),
-            abi.encodeWithSelector(CRV_USD_FEED.latestRoundData.selector),
+            address(crvRepayment.CRV_USD_FEED()),
+            abi.encodeWithSelector(crvRepayment.CRV_USD_FEED().latestRoundData.selector),
             abi.encode(uint80(10), price, uint256(2), uint256(3), uint80(10))
         );
 
@@ -368,19 +393,5 @@ contract ProposalPayloadE2E is Test {
         crvRepayment.getOraclePrice();
 
         vm.clearMockedCalls();
-    }
-
-    function testRepaySuccessful() public {
-        GovHelpers.passVoteAndExecute(vm, proposalId);
-
-        vm.startPrank(CRV_WHALE);
-        CRV.approve(address(crvRepayment), 2_656_500e18);
-
-        crvRepayment.purchase(2_656_355e18, false);
-        vm.stopPrank();
-
-        uint256 amountPaid = crvRepayment.repay();
-
-        assertEq(amountPaid, 2_656_355e18);
     }
 }
