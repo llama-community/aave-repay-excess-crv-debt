@@ -32,8 +32,6 @@ contract CRVBadDebtRepayment {
     error ExcessCRVAmountIn(uint256 amountLeft);
     /// AUSDC cap fulfilled
     error ExcessAUSDCPurchased(uint256 amountLeft);
-    /// Not enough CRV in contract to repay bad debt
-    error NotEnoughCRV(uint256 amount);
     /// Oracle price is 0 or lower
     error InvalidOracleAnswer();
     /// Need to request more than 0 tokens out
@@ -103,9 +101,7 @@ contract CRVBadDebtRepayment {
     }
 
     /// @notice Repays CRV debt on behalf of BAD_DEBTOR address
-    /// @dev Check balance of contract before repaying to ensure it has enough funds
     function repay() external returns (uint256) {
-        if (totalCRVReceived < CRV_CAP) revert NotEnoughCRV(totalCRVReceived);
         CRV.approve(address(AaveV2Ethereum.POOL), totalCRVReceived);
         CRV.safeTransferFrom(AaveV2Ethereum.COLLECTOR, address(this), totalCRVReceived);
         return AaveV2Ethereum.POOL.repay(address(CRV), totalCRVReceived, 2, BAD_DEBTOR);
