@@ -26,12 +26,7 @@ contract ProposalPayload {
     function execute() external {
         // Approve this contract to spend USDC balance of Aave V2 Collector to deposit into aUSDC
         uint256 balance = crvRepayment.USDC().balanceOf(AaveV2Ethereum.COLLECTOR);
-        AaveMisc.AAVE_ECOSYSTEM_RESERVE_CONTROLLER.transfer(
-            AaveV2Ethereum.COLLECTOR,
-            USDC,
-            address(this),
-            balance
-        );
+        AaveMisc.AAVE_ECOSYSTEM_RESERVE_CONTROLLER.transfer(AaveV2Ethereum.COLLECTOR, USDC, address(this), balance);
         crvRepayment.USDC().approve(address(AaveV2Ethereum.POOL), balance);
         AaveV2Ethereum.POOL.deposit(USDC, balance, AaveV2Ethereum.COLLECTOR, 0);
 

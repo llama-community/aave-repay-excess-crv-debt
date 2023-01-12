@@ -13,16 +13,18 @@ import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 contract CRVBadDebtRepayment is ICRVBadDebtRepayment {
     using SafeERC20 for IERC20;
 
+    /// The price of CRV is too high for the swap
+    error CRVPriceTooHigh(int256 price, int256 maxPrice);
     /// CRV cap fulfilled
     error ExcessCRVAmountIn(uint256 amountLeft);
     /// AUSDC cap fulfilled
     error ExcessAUSDCPurchased(uint256 amountLeft);
     /// Oracle price is 0 or lower
     error InvalidOracleAnswer();
-    /// Need to request more than 0 tokens out
-    error OnlyNonZeroAmount();
     /// Need CRV in the contract to call this function
     error NoCRVForRepayment();
+    /// Need to request more than 0 tokens out
+    error OnlyNonZeroAmount();
 
     IERC20 public constant CRV = IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
     IERC20 public constant USDC = IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
@@ -32,8 +34,9 @@ contract CRVBadDebtRepayment is ICRVBadDebtRepayment {
     AggregatorV3Interface public constant CRV_USD_FEED =
         AggregatorV3Interface(0xCd627aA160A6fA45Eb793D19Ef54f5062F20f33f);
 
+    int256 public constant MAX_ORACLE_PRICE = 74820000;
     uint256 public constant AUSDC_CAP = 2_000_000e6;
-    uint256 public constant CRV_CAP = 2_656_355e18;
+    uint256 public constant CRV_CAP = 2_673_000e18;
     uint256 public totalCRVReceived;
     uint256 public totalAUSDCSold;
 
@@ -91,15 +94,17 @@ contract CRVBadDebtRepayment is ICRVBadDebtRepayment {
     function getOraclePrice() public view override returns (uint256) {
         (, int256 price, , , ) = CRV_USD_FEED.latestRoundData();
         if (price <= 0) revert InvalidOracleAnswer();
+        if (price > MAX_ORACLE_PRICE) revert CRVPriceTooHigh(price, MAX_ORACLE_PRICE);
         return uint256(price);
     }
 
     /// @inheritdoc ICRVBadDebtRepayment
     function repay() external returns (uint256) {
-        if (CRV.balanceOf(AaveV2Ethereum.COLLECTOR) == 0) revert NoCRVForRepayment();
-        CRV.approve(address(AaveV2Ethereum.POOL), totalCRVReceived);
-        CRV.safeTransferFrom(AaveV2Ethereum.COLLECTOR, address(this), totalCRVReceived);
-        return AaveV2Ethereum.POOL.repay(address(CRV), totalCRVReceived, 2, BAD_DEBTOR);
+        uint256 balance = CRV.balanceOf(AaveV2Ethereum.COLLECTOR);
+        if (balance == 0) revert NoCRVForRepayment();
+        CRV.approve(address(AaveV2Ethereum.POOL), balance);
+        CRV.safeTransferFrom(AaveV2Ethereum.COLLECTOR, address(this), balance);
+        return AaveV2Ethereum.POOL.repay(address(CRV), balance, 2, BAD_DEBTOR);
     }
 
     /// @inheritdoc ICRVBadDebtRepayment

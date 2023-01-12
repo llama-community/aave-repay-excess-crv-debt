@@ -22,6 +22,7 @@ contract ProposalPayloadE2E is Test {
     address public constant CRV_WHALE = 0x28C6c06298d514Db089934071355E5743bf21d60;
     address public constant USDC_WHALE = 0x55FE002aefF02F77364de339a1292923A15844B8;
     address public constant ETH_WHALE = 0xF977814e90dA44bFA03b6295A0616a897441aceC;
+    address public constant VARIABLE_DEBT_CRV = 0x00ad8eBF64F141f1C81e9f8f792d3d1631c6c684;
 
     uint256 public constant CRV_AMOUNT_IN = 50_000e18;
     uint256 public proposalId;
@@ -101,7 +102,9 @@ contract ProposalPayloadE2E is Test {
 
         vm.startPrank(CRV_WHALE);
         crvRepayment.CRV().approve(address(crvRepayment), CRV_AMOUNT_IN);
-        vm.expectRevert(abi.encodeWithSelector(CRVBadDebtRepayment.ExcessCRVAmountIn.selector, 6_355e18));
+        vm.expectRevert(
+            abi.encodeWithSelector(CRVBadDebtRepayment.ExcessCRVAmountIn.selector, 23000000000000000000000)
+        );
         crvRepayment.purchase(CRV_AMOUNT_IN, false);
         vm.stopPrank();
     }
@@ -212,6 +215,27 @@ contract ProposalPayloadE2E is Test {
         vm.clearMockedCalls();
     }
 
+    function testOraclePriceTooHigh() public {
+        // Mocking returned value of Price = 0.75
+        int256 mockedPrice = 75000000;
+        vm.mockCall(
+            address(crvRepayment.CRV_USD_FEED()),
+            abi.encodeWithSelector(crvRepayment.CRV_USD_FEED().latestRoundData.selector),
+            abi.encode(uint80(10), int256(mockedPrice), uint256(2), uint256(3), uint80(10))
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CRVBadDebtRepayment.CRVPriceTooHigh.selector,
+                mockedPrice,
+                crvRepayment.MAX_ORACLE_PRICE()
+            )
+        );
+        crvRepayment.getOraclePrice();
+
+        vm.clearMockedCalls();
+    }
+
     function testOraclePriceNegativeAmount() public {
         // Mocking returned value of Price < 0
         vm.mockCall(
@@ -258,18 +282,45 @@ contract ProposalPayloadE2E is Test {
         crvRepayment.repay();
     }
 
-    function testRepaySuccessful() public {
+    function testRepayPortion() public {
+        uint256 expectedVariableDebtTokens = 2_670_411_225358009139073680;
+        uint256 variableDebtBalanceTokensBefore = IERC20(VARIABLE_DEBT_CRV).balanceOf(crvRepayment.BAD_DEBTOR());
+        assertEq(variableDebtBalanceTokensBefore, expectedVariableDebtTokens);
+
         GovHelpers.passVoteAndExecute(vm, proposalId);
 
         vm.startPrank(CRV_WHALE);
-        crvRepayment.CRV().approve(address(crvRepayment), 2_656_500e18);
+        crvRepayment.CRV().approve(address(crvRepayment), 100_000e18);
 
-        crvRepayment.purchase(2_656_355e18, false);
+        crvRepayment.purchase(100_000e18, false);
+        vm.stopPrank();
+
+        uint256 amountPaid = crvRepayment.repay();
+        uint256 variableDebtTokensAfter = IERC20(VARIABLE_DEBT_CRV).balanceOf(crvRepayment.BAD_DEBTOR());
+
+        assertEq(amountPaid, 100_000e18);
+        assertTrue(variableDebtBalanceTokensBefore > variableDebtTokensAfter);
+        assertEq(variableDebtTokensAfter, 2570888024685060400087965);
+    }
+
+    function testRepaySuccessful() public {
+        uint256 ACTUAL_DEBT = 2_670_888_024685060400087965;
+        uint256 expectedVariableDebtTokens = 2_670_411_225358009139073680;
+        uint256 variableDebtBalanceTokensBefore = IERC20(VARIABLE_DEBT_CRV).balanceOf(crvRepayment.BAD_DEBTOR());
+        assertEq(variableDebtBalanceTokensBefore, expectedVariableDebtTokens);
+
+        GovHelpers.passVoteAndExecute(vm, proposalId);
+
+        vm.startPrank(CRV_WHALE);
+        crvRepayment.CRV().approve(address(crvRepayment), crvRepayment.CRV_CAP());
+
+        crvRepayment.purchase(crvRepayment.CRV_CAP(), false);
         vm.stopPrank();
 
         uint256 amountPaid = crvRepayment.repay();
 
-        assertEq(amountPaid, 2_656_355e18);
+        assertEq(amountPaid, ACTUAL_DEBT);
+        assertEq(IERC20(VARIABLE_DEBT_CRV).balanceOf(crvRepayment.BAD_DEBTOR()), 0);
     }
 
     function testRescueTokens() public {
