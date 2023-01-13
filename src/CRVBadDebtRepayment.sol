@@ -41,11 +41,11 @@ contract CRVBadDebtRepayment is ICRVBadDebtRepayment {
     uint256 public totalAUSDCSold;
 
     /// @inheritdoc ICRVBadDebtRepayment
-    function purchase(uint256 _amountIn, bool _toUnderlying) external returns (uint256 amountOut) {
+    function purchase(uint256 _amountIn, bool _toUnderlying) external returns (uint256) {
         if (_amountIn == 0) revert OnlyNonZeroAmount();
         if (_amountIn > availableCRVToBeFilled()) revert ExcessCRVAmountIn(availableCRVToBeFilled());
 
-        amountOut = getAmountOut(_amountIn);
+        uint256 amountOut = getAmountOut(_amountIn);
         if (amountOut == 0) revert OnlyNonZeroAmount();
         if (amountOut > availableAUSDCToBeSold()) revert ExcessAUSDCPurchased(availableAUSDCToBeSold());
 
