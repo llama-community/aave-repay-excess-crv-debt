@@ -94,16 +94,16 @@ contract ProposalPayloadE2E is Test {
         GovHelpers.passVoteAndExecute(vm, proposalId);
 
         // totalCrvReceived is storage slot 0
-        // Setting current totalCRVReceived to 2,650,000 CRV
-        vm.store(address(crvRepayment), bytes32(uint256(0)), bytes32(uint256(2_650_000e18)));
+        // Setting current totalCRVReceived to 2,660,000 CRV
+        vm.store(address(crvRepayment), bytes32(uint256(0)), bytes32(uint256(2_660_000e18)));
 
-        assertEq(crvRepayment.totalCRVReceived(), 2_650_000e18);
+        assertEq(crvRepayment.totalCRVReceived(), 2_660_000e18);
         assertLe(crvRepayment.totalCRVReceived(), crvRepayment.CRV_CAP());
 
         vm.startPrank(CRV_WHALE);
         crvRepayment.CRV().approve(address(crvRepayment), CRV_AMOUNT_IN);
         vm.expectRevert(
-            abi.encodeWithSelector(CRVBadDebtRepayment.ExcessCRVAmountIn.selector, 23000000000000000000000)
+            abi.encodeWithSelector(CRVBadDebtRepayment.ExcessCRVAmountIn.selector, 40000000000000000000000)
         );
         crvRepayment.purchase(CRV_AMOUNT_IN, false);
         vm.stopPrank();
@@ -114,12 +114,12 @@ contract ProposalPayloadE2E is Test {
         GovHelpers.passVoteAndExecute(vm, proposalId);
 
         // totalAUSDCSold is storage slot 1
-        // Setting current totalCRVReceived to 1,900,000 aUSDC
-        vm.store(address(crvRepayment), bytes32(uint256(1)), bytes32(uint256(1_990_000e6)));
+        // Setting current totalCRVReceived to 3,100,000 aUSDC
+        vm.store(address(crvRepayment), bytes32(uint256(1)), bytes32(uint256(3_100_000e6)));
 
         vm.startPrank(CRV_WHALE);
         crvRepayment.CRV().approve(address(crvRepayment), CRV_AMOUNT_IN);
-        vm.expectRevert(abi.encodeWithSelector(CRVBadDebtRepayment.ExcessAUSDCPurchased.selector, 10_000e6));
+        vm.expectRevert(abi.encodeWithSelector(CRVBadDebtRepayment.ExcessAUSDCPurchased.selector, 5_000e6));
         crvRepayment.purchase(CRV_AMOUNT_IN, false);
         vm.stopPrank();
     }
@@ -216,8 +216,8 @@ contract ProposalPayloadE2E is Test {
     }
 
     function testOraclePriceTooHigh() public {
-        // Mocking returned value of Price = 0.75
-        int256 mockedPrice = 75000000;
+        // Mocking returned value of Price = 1.16
+        int256 mockedPrice = 116000000;
         vm.mockCall(
             address(crvRepayment.CRV_USD_FEED()),
             abi.encodeWithSelector(crvRepayment.CRV_USD_FEED().latestRoundData.selector),

@@ -34,9 +34,9 @@ contract CRVBadDebtRepayment is ICRVBadDebtRepayment {
     AggregatorV3Interface public constant CRV_USD_FEED =
         AggregatorV3Interface(0xCd627aA160A6fA45Eb793D19Ef54f5062F20f33f);
 
-    int256 public constant MAX_ORACLE_PRICE = 74820000;
-    uint256 public constant AUSDC_CAP = 2_000_000e6;
-    uint256 public constant CRV_CAP = 2_673_000e18;
+    int256 public constant MAX_ORACLE_PRICE = 115000000;
+    uint256 public constant AUSDC_CAP = 3_105_000e6;
+    uint256 public constant CRV_CAP = 2_700_000e18;
     uint256 public totalCRVReceived;
     uint256 public totalAUSDCSold;
 

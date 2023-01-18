@@ -6,7 +6,7 @@ This repository contains the payload to deploy a contract that allows the AAVE c
 
 This proposal does the following:
 
-1. Approve the CRVBadDebtRepayment contract to spend up to 2,000,000 USDC/aUSDC from the AAVE V2 Collector contract.
+1. Approve the CRVBadDebtRepayment contract to spend up to 3,105,000 USDC/aUSDC from the AAVE V2 Collector contract.
 
 Then, the contract itself has the following functions:
 
