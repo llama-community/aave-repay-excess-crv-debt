@@ -317,10 +317,26 @@ contract ProposalPayloadE2E is Test {
         crvRepayment.purchase(crvRepayment.CRV_CAP(), false);
         vm.stopPrank();
 
+        uint256 aaveCollectorCRVBalanceBeforeRepayment = crvRepayment.CRV().balanceOf(AaveV2Ethereum.COLLECTOR);
+
         uint256 amountPaid = crvRepayment.repay();
 
+        assertEq(crvRepayment.CRV().balanceOf(AaveV2Ethereum.COLLECTOR), 0);
         assertEq(amountPaid, ACTUAL_DEBT);
         assertEq(IERC20(VARIABLE_DEBT_CRV).balanceOf(crvRepayment.BAD_DEBTOR()), 0);
+
+        // There's like ~30k CRV left in the swap contract after repayment.
+        uint256 crvRepaymentContractCRVBalance = crvRepayment.CRV().balanceOf(address(crvRepayment));
+        console.log(crvRepaymentContractCRVBalance);
+        assertEq(crvRepaymentContractCRVBalance, aaveCollectorCRVBalanceBeforeRepayment - amountPaid);
+
+        // We can recover it though
+        address[] memory tokens = new address[](1);
+        tokens[0] = address(crvRepayment.CRV());
+        crvRepayment.rescueTokens(tokens);
+
+        assertEq(crvRepayment.CRV().balanceOf(address(crvRepayment)), 0);
+        assertEq(crvRepayment.CRV().balanceOf(AaveV2Ethereum.COLLECTOR), crvRepaymentContractCRVBalance);
     }
 
     function testRescueTokens() public {
